@@ -1,0 +1,27 @@
+latency:
+  min_delay: 1.0
+  max_delay: 6.0
+  probability: 0.8
+
+bad_data:
+  corruption_rate: 0.5
+  mode: append  # replace | append | empty
+
+api_failure:
+  probability: 0.3
+  error_messages:
+    - "503 Service Unavailable: OpenAI API is down."
+    - "429 Too Many Requests: Rate limit exceeded."
+    - "Connection timeout after 30s."
+    - "500 Internal Server Error from upstream LLM."
+
+presets:
+  light:
+    latency: {min_delay: 0.5, max_delay: 1.5, probability: 0.5}
+    bad_data: {corruption_rate: 0.2, mode: append}
+    api_failure: {probability: 0.1}
+
+  heavy:
+    latency: {min_delay: 3.0, max_delay: 8.0, probability: 1.0}
+    bad_data: {corruption_rate: 0.8, mode: replace}
+    api_failure: {probability: 0.5}

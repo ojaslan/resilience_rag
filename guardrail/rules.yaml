@@ -1,0 +1,17 @@
+max_input_length: 2000
+max_output_length: 4000
+
+blocked_patterns:
+  - "ignore previous instructions"
+  - "jailbreak"
+  - "forget your instructions"
+  - "you are now"
+  - "pretend you are"
+  - "\\bSQL\\s+injection\\b"
+  - "<script>"
+
+hallucination_phrases:
+  - "I don't have access to real-time"
+  - "as an AI language model"
+  - "I cannot browse the internet"
+  - "my training data"
