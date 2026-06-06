@@ -1,17 +1,17 @@
 import logging
 import time
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from langchain_groq import ChatGroq
-from langchain.agents import AgentExecutor, create_openai_functions_agent
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.tools import tool
 
 from config.settings import settings
 from agent.prompts import AGENT_SYSTEM_PROMPT
-from agent.memory import SessionMemory
+from agent.memory import SimpleMemory
 from agent.tools import retrieve_documents, list_sources, set_retriever
-from guardrail.input_guard import InputGuard
-from guardrail.output_guard import OutputGuard
+from guardrails.input_guard import InputGuard
+from guardrails.output_guard import OutputGuard
 from chaos.engine import ChaosEngine
 from rag.embedder import VectorEmbedder
 from rag.retriever import DocumentRetriever
@@ -20,10 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class AgentRunner:
-    """Wires together: RAG → Guardrails (in) → Groq Agent → Guardrails (out) + Chaos"""
+    """Wires: RAG → Guardrails(in) → Groq Agent → Guardrails(out) + Chaos"""
 
     def __init__(self):
-        # Use Groq LLM via langchain-groq
         self.llm = ChatGroq(
             model=settings.GROQ_MODEL,
             groq_api_key=settings.GROQ_API_KEY,
@@ -34,26 +33,14 @@ class AgentRunner:
         self.output_guard = OutputGuard()
         self.chaos = ChaosEngine()
 
-        # Bootstrap RAG with HuggingFace embeddings
         embedder = VectorEmbedder()
         store = embedder.get_or_load()
         retriever = DocumentRetriever(store)
         set_retriever(retriever)
         self.retriever = retriever
 
-        tools = [retrieve_documents, list_sources]
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", AGENT_SYSTEM_PROMPT),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder("agent_scratchpad"),
-        ])
-        # create_openai_functions_agent works with Groq as it supports the same function calling interface
-        agent = create_openai_functions_agent(self.llm, tools, prompt)
-        self.executor = AgentExecutor(
-            agent=agent, tools=tools, verbose=True,
-            handle_parsing_errors=True, max_iterations=5,
-        )
+        # Bind tools to LLM
+        self.llm_with_tools = self.llm.bind_tools([retrieve_documents, list_sources])
 
     def run(self, query: str, session_id: str = "default") -> Dict[str, Any]:
         start = time.time()
@@ -65,7 +52,7 @@ class AgentRunner:
             "model": settings.GROQ_MODEL,
         }
 
-        # --- Input guardrail ---
+        # Input guardrail
         valid, reason = self.input_guard.validate(query)
         if not valid:
             result.update(answer=f"⚠️ Input blocked: {reason}",
@@ -73,16 +60,24 @@ class AgentRunner:
             return result
 
         query = self.input_guard.sanitize(query)
-        memory = SessionMemory.get(session_id)
-        chat_history = memory.chat_memory.messages
 
-        # --- Run agent (with possible chaos) ---
         try:
             def _call():
-                return self.executor.invoke({"input": query, "chat_history": chat_history})
+                # Step 1: retrieve docs
+                docs = self.retriever.retrieve(query)
+                context = self.retriever.format_context(docs)
 
-            response = self.chaos.inject(_call) if self.chaos.enabled else _call()
-            answer = response.get("output", "No response generated.")
+                # Step 2: build messages
+                messages = [
+                    SystemMessage(content=AGENT_SYSTEM_PROMPT + f"\n\nContext:\n{context}"),
+                    HumanMessage(content=query),
+                ]
+
+                # Step 3: call Groq
+                response = self.llm.invoke(messages)
+                return response.content
+
+            answer = self.chaos.inject(_call) if self.chaos.enabled else _call()
 
         except Exception as e:
             logger.error(f"Agent error: {e}")
@@ -91,7 +86,7 @@ class AgentRunner:
                           latency_ms=round((time.time() - start) * 1000))
             return result
 
-        # --- Output guardrail ---
+        # Output guardrail
         out_valid, out_reason = self.output_guard.validate(answer)
         if not out_valid:
             result.update(answer=f"⚠️ Output blocked: {out_reason}",
@@ -99,7 +94,7 @@ class AgentRunner:
         else:
             result["answer"] = answer
 
-        memory.save_context({"input": query}, {"answer": result["answer"]})
+        SimpleMemory.add(session_id, query, result["answer"])
         result["chaos_events"] = self.chaos.get_log()[-5:]
         result["latency_ms"] = round((time.time() - start) * 1000)
         return result

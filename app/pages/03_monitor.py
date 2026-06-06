@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from agent.memory import SessionMemory
+from agent.memory import SimpleMemory
 from config.settings import settings
 
 st.set_page_config(page_title="Monitor | ResilienceAI", page_icon="📊", layout="wide")
@@ -42,9 +42,8 @@ st.markdown("---")
 col_a, col_b = st.columns(2)
 
 with col_a:
-    st.subheader("Response Latency per Turn")
+    st.subheader("Latency per Turn")
     fig = px.bar(df, x="Turn", y="Latency (ms)", color_discrete_sequence=["#7F77DD"])
-    fig.update_layout(margin=dict(t=10, b=10))
     st.plotly_chart(fig, use_container_width=True)
 
 with col_b:
@@ -54,7 +53,6 @@ with col_b:
                               name="Guardrail", line=dict(color="#D85A30")))
     fig2.add_trace(go.Scatter(x=df["Turn"], y=df["Chaos Events"],
                               name="Chaos Events", line=dict(color="#EF9F27")))
-    fig2.update_layout(margin=dict(t=10, b=10))
     st.plotly_chart(fig2, use_container_width=True)
 
 st.markdown("---")
@@ -62,12 +60,13 @@ st.subheader("Conversation Log")
 st.dataframe(df, use_container_width=True)
 
 st.subheader("Memory State")
-sessions = SessionMemory.all_sessions()
+sessions = SimpleMemory.all_sessions()
 if sessions:
     sel = st.selectbox("Session", sessions)
-    history = SessionMemory.get_history(sel)
+    history = SimpleMemory.get_history(sel)
     for msg in history:
-        role = getattr(msg, "type", "unknown")
-        st.markdown(f"**{role.upper()}:** {msg.content}")
+        st.markdown(f"**USER:** {msg['human']}")
+        st.markdown(f"**AI:** {msg['ai']}")
+        st.markdown("---")
 else:
     st.info("No session memory recorded.")

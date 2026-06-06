@@ -1,33 +1,31 @@
-from langchain.memory import ConversationBufferWindowMemory
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 from typing import List
 
 
-class SessionMemory:
-    """Manages per-session conversation memory."""
-
+class SimpleMemory:
+    """Simple per-session conversation memory."""
     _sessions: dict = {}
 
     @classmethod
-    def get(cls, session_id: str = "default") -> ConversationBufferWindowMemory:
+    def get(cls, session_id: str = "default") -> list:
         if session_id not in cls._sessions:
-            cls._sessions[session_id] = ConversationBufferWindowMemory(
-                k=10,
-                memory_key="chat_history",
-                return_messages=True,
-                output_key="answer",
-            )
+            cls._sessions[session_id] = []
         return cls._sessions[session_id]
 
     @classmethod
-    def clear(cls, session_id: str = "default"):
-        if session_id in cls._sessions:
-            cls._sessions[session_id].clear()
+    def add(cls, session_id: str, human: str, ai: str):
+        history = cls.get(session_id)
+        history.append({"human": human, "ai": ai})
+        if len(history) > 10:
+            history.pop(0)
 
     @classmethod
-    def get_history(cls, session_id: str = "default") -> List[BaseMessage]:
-        memory = cls.get(session_id)
-        return memory.chat_memory.messages
+    def clear(cls, session_id: str = "default"):
+        cls._sessions[session_id] = []
+
+    @classmethod
+    def get_history(cls, session_id: str = "default") -> list:
+        return cls.get(session_id)
 
     @classmethod
     def all_sessions(cls) -> List[str]:

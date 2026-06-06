@@ -2,7 +2,7 @@ import logging
 import time
 from typing import List, Tuple
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 
 from config.settings import settings
@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentRetriever:
-    """Retrieves relevant documents from the FAISS vector store."""
-
     def __init__(self, store: FAISS):
         self.store = store
         self.k = settings.MAX_RETRIEVAL_DOCS

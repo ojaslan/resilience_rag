@@ -1,15 +1,10 @@
-import os
 import logging
 from pathlib import Path
 from typing import List
 
-from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import (
-    PyPDFLoader,
-    TextLoader,
-    DirectoryLoader,
-)
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
 from config.settings import settings
 
@@ -17,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentIngestor:
-    """Loads raw documents and splits them into chunks."""
-
     def __init__(self):
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.CHUNK_SIZE,
@@ -32,15 +25,13 @@ class DocumentIngestor:
         if not path.exists():
             logger.warning(f"Data directory {directory} does not exist.")
             return []
-
         docs = []
         for file in path.rglob("*"):
             if file.suffix == ".pdf":
                 docs.extend(self._load_pdf(str(file)))
             elif file.suffix in [".txt", ".md"]:
                 docs.extend(self._load_text(str(file)))
-
-        logger.info(f"Loaded {len(docs)} raw documents from {directory}")
+        logger.info(f"Loaded {len(docs)} raw documents")
         return docs
 
     def _load_pdf(self, path: str) -> List[Document]:
