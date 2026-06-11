@@ -4,6 +4,14 @@ A production-grade agentic AI system using **Groq** (llama3-70b), **LangChain**,
 
 ---
 
+
+## 🐍 Python Version
+
+This project was developed and tested using:
+
+```bash
+Python 3.12.0
+
 ## 🏗️ Architecture
 
 ```
