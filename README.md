@@ -11,12 +11,11 @@ This project was developed and tested using:
 
 ```bash
 Python 3.12.0
+```
 
 
 
-
-
-
+```bash
 ## 🏗️ Architecture
 
 ```
